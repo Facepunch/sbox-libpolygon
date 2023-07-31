@@ -6,6 +6,10 @@ namespace Sandbox.Polygons;
 
 partial class PolygonMeshBuilder
 {
+	/// <summary>
+	/// Triangulate any remaining active edges so that the generated mesh is closed.
+	/// </summary>
+	/// <param name="smooth">If true, use smooth normals when closing edges connecting existing generated vertices.</param>
 	public void Close( bool smooth )
 	{
 		Close_UpdateExistingVertices( smooth );

@@ -4,6 +4,10 @@ using System.Linq;
 
 namespace Sandbox.Polygons;
 
+/// <summary>
+/// Helper class for building 3D meshes based on a 2D polygon. Supports
+/// concave polygons with holes, although edges must not intersect.
+/// </summary>
 public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 {
 	private int _nextEdgeIndex;
@@ -29,15 +33,40 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 	private float _minSmoothNormalDot;
 
+	/// <summary>
+	/// Number of edges that will be affected by calls to methods like <see cref="Bevel"/>, <see cref="Round"/>, and <see cref="Close"/>.
+	/// </summary>
 	public int ActiveEdgeCount => _activeEdges.Count;
+
+	/// <summary>
+	/// If true, no active edges remain because the mesh is fully closed.
+	/// </summary>
 	public bool IsClosed => _activeEdges.Count == 0;
 
-	public float MaxSmoothAngle = 0f;
+	/// <summary>
+	/// Corners of the original polygon with an interior or exterior
+	/// angle less than this (in degrees) will have smooth normals.
+	/// </summary>
+	public float MaxSmoothAngle { get; set; } = 0f;
 
+	/// <summary>
+	/// Positions of each vertex in the generated mesh.
+	/// </summary>
 	public IReadOnlyList<Vector3> Vertices => _vertices;
-	public IReadOnlyList<Vector3> Normals => _normals;
+
+	/// <summary>
+	/// Normals of each vertex in the generated mesh.
+	/// </summary>
+    public IReadOnlyList<Vector3> Normals => _normals;
+	
+	/// <summary>
+	/// Indices of vertices describing the triangulation of the generated mesh.
+	/// </summary>
 	public IReadOnlyList<int> Indices => _indices;
 
+	/// <summary>
+	/// Clear all geometry from this builder.
+	/// </summary>
 	public void Clear()
 	{
 		_nextEdgeIndex = 0;
@@ -63,6 +92,9 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		_minSmoothNormalDot = 0f;
 	}
 
+	/// <summary>
+	/// Reset this builder to be like a new instance.
+	/// </summary>
 	public override void Reset()
 	{
 		Clear();
@@ -97,6 +129,13 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		return edge.Index;
 	}
 
+	/// <summary>
+	/// Add a set of active edges forming a loop. Clockwise loops will be a solid polygon, and count-clockwise
+	/// will form a hole. Holes must be inside of solid polygons, otherwise the mesh can't be closed correctly.
+	/// </summary>
+	/// <param name="vertices">List of vertices to read a range from.</param>
+	/// <param name="offset">Index of the first vertex in the loop.</param>
+	/// <param name="count">Number of vertices in the loop.</param>
 	public void AddEdgeLoop( IReadOnlyList<Vector2> vertices, int offset, int count )
 	{
 		var firstIndex = _nextEdgeIndex;
@@ -126,6 +165,11 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 	[ThreadStatic]
 	private static Dictionary<int, int> AddEdges_VertexMap;
 
+	/// <summary>
+	/// Add a raw set of edges. Be careful to ensure that each loop of edges is fully closed.
+	/// </summary>
+	/// <param name="vertices">Positions of vertices to connect with edges.</param>
+	/// <param name="edges">Indices of the start and end vertices of each edge.</param>
 	public void AddEdges( IReadOnlyList<Vector2> vertices, IReadOnlyList<(int Prev, int Next)> edges )
 	{
 		AddEdges_VertexMap ??= new Dictionary<int, int>();
@@ -263,6 +307,13 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		_indices.Add( c );
 	}
 
+	/// <summary>
+	/// Perform successive <see cref="Bevel"/>s so that the edge of the polygon curves inwards.
+	/// </summary>
+	/// <param name="faces">How many bevels to split the rounded edge into.</param>
+	/// <param name="width">Total distance inwards.</param>
+	/// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
+	/// <param name="smooth">If true, use smooth normals rather than flat shading.</param>
 	public void Round( int faces, float width, float height, bool smooth )
 	{
 		var prevWidth = 0f;

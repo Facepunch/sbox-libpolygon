@@ -12,7 +12,15 @@ partial class PolygonMeshBuilder
 
 	[ThreadStatic] private static List<int> Bevel_ActiveEdgeList;
 
-	public void Bevel( float width, float height, bool smooth )
+    /// <summary>
+    /// Add faces starting at each active edge, traveling inwards and upwards to produce a bevel.
+    /// If the bevel distance is large enough the mesh will become closed. Otherwise, you can use
+    /// <see cref="Close"/> to add a flat face after the bevel.
+    /// </summary>
+    /// <param name="width">Total distance inwards.</param>
+    /// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
+    /// <param name="smooth">If true, use smooth normals rather than flat shading.</param>
+    public void Bevel( float width, float height, bool smooth )
 	{
 		if ( width < 0f )
 		{
