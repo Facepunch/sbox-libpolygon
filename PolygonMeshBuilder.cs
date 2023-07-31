@@ -228,7 +228,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 		var pos = new Vector3( edge.Origin.x, edge.Origin.y, height );
 
-		if ( MathF.Abs( _nextDistance - _prevDistance ) <= 0.001f )
+		if ( MathF.Abs( _nextHeight - _prevHeight ) <= 0.001f )
 		{
 			_vertices.Add( pos );
 			_normals.Add( new Vector3( 0f, 0f, 1f ) );
@@ -306,6 +306,16 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		_indices.Add( b );
 		_indices.Add( c );
 	}
+
+    /// <summary>
+    /// Add faces on each active edge extending upwards by the given height.
+    /// </summary>
+    /// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
+    /// <param name="smooth">If true, use smooth normals rather than flat shading.</param>
+    public void Extrude( float height, bool smooth )
+    {
+	    Bevel( 0f, height, smooth );
+    }
 
 	/// <summary>
 	/// Perform successive <see cref="Bevel"/>s so that the edge of the polygon curves inwards.
