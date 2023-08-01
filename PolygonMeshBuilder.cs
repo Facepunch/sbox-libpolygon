@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using static Sandbox.Package;
 
 namespace Sandbox.Polygons;
 
@@ -291,6 +290,40 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 	}
 
 	/// <summary>
+	/// Mirrors all previously created faces. The mirror plane is normal to the Z axis, with a given distance from the origin.
+	/// </summary>
+	/// <param name="z">Distance of the mirror plane from the origin.</param>
+	public void Mirror( float z = 0f )
+	{
+		_vertices.EnsureCapacity( _vertices.Count * 2 );
+		_normals.EnsureCapacity( _normals.Count * 2 );
+		_indices.EnsureCapacity( _indices.Count * 2 );
+
+		var indexCount = _indices.Count;
+		var vertexCount = _vertices.Count;
+
+		for ( var i = 0; i < vertexCount; i++ )
+		{
+			var position = _vertices[i];
+			var normal = _normals[i];
+
+			_vertices.Add( new Vector3( position.x, position.y, z * 2f - position.z ) );
+			_normals.Add( new Vector3( normal.x, normal.y, -normal.z ) );
+		}
+
+		for ( var i = 0; i < indexCount; i += 3 )
+		{
+			var a = _indices[i + 0] + vertexCount;
+			var b = _indices[i + 1] + vertexCount;
+			var c = _indices[i + 2] + vertexCount;
+
+			_indices.Add( a );
+			_indices.Add( c );
+			_indices.Add( b );
+		}
+	}
+
+	/// <summary>
 	/// Perform successive <see cref="Bevel"/>s so that the edge of the polygon curves inwards in a quarter circle arc.
 	/// </summary>
 	/// <param name="faces">How many bevels to split the rounded edge into.</param>
@@ -336,7 +369,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 						MapAngle( prevTheta, convex, height >= 0f ),
 						MapAngle( theta, convex, height >= 0f ) );
 				}
-            }
+			}
 			else
 			{
 				if ( height >= 0f == convex )
@@ -349,7 +382,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 					Bevel( (nextHeight - prevHeight) * width,
 						(nextWidth - prevWidth) * height );
 				}
-            }
+			}
 
 			prevWidth = nextWidth;
 			prevHeight = nextHeight;
