@@ -9,10 +9,9 @@ partial class PolygonMeshBuilder
 	/// <summary>
 	/// Triangulate any remaining active edges so that the generated mesh is closed.
 	/// </summary>
-	/// <param name="smooth">If true, use smooth normals when closing edges connecting existing generated vertices.</param>
-	public void Close( bool smooth )
+	public void Close()
 	{
-		Close_UpdateExistingVertices( smooth );
+		Close_UpdateExistingVertices();
 		Close_SplitIntoMonotonicPolygons();
 		Close_Triangulate();
 
@@ -187,23 +186,12 @@ partial class PolygonMeshBuilder
 		throw new Exception();
 	}
 
-	private void Close_UpdateExistingVertices( bool smooth )
+	private void Close_UpdateExistingVertices()
 	{
-		_prevAngle = _nextAngle = MathF.PI * 0.5f;
+		_nextAngle = MathF.PI * 0.5f;
 		_nextDistance = float.PositiveInfinity;
 
-		if ( smooth )
-		{
-			BlendNormals( _prevPrevHeight, _prevHeight, _prevPrevAngle, _prevAngle );
-
-			foreach ( var index in _activeEdges )
-			{
-				ref var edge = ref _allEdges[index];
-
-				AddVertices( ref edge, true );
-			}
-		}
-		else
+		if ( Math.Abs( _prevAngle - _nextAngle ) >= 0.001f )
 		{
 			foreach ( var index in _activeEdges )
 			{
@@ -213,6 +201,8 @@ partial class PolygonMeshBuilder
 				AddVertices( ref edge, true );
 			}
 		}
+
+		_prevAngle = _nextAngle;
 	}
 
 	private void Close_SplitIntoMonotonicPolygons()

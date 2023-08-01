@@ -12,22 +12,41 @@ partial class PolygonMeshBuilder
 
 	[ThreadStatic] private static List<int> Bevel_ActiveEdgeList;
 
-    /// <summary>
-    /// Add faces starting at each active edge, traveling inwards and upwards to produce a bevel.
-    /// If the bevel distance is large enough the mesh will become closed. Otherwise, you can use
-    /// <see cref="Close"/> to add a flat face after the bevel.
-    /// </summary>
-    /// <param name="width">Total distance inwards.</param>
-    /// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
-    /// <param name="smooth">If true, use smooth normals rather than flat shading.</param>
-    public void Bevel( float width, float height, bool smooth )
+
+	/// <summary>
+	/// Add faces starting at each active edge, traveling inwards and upwards to produce a bevel.
+	/// If the bevel distance is large enough the mesh will become closed. Otherwise, you can use
+	/// <see cref="Close"/> to add a flat face after the bevel.
+	/// </summary>
+	/// <param name="width">Total distance inwards.</param>
+	/// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
+	public void Bevel( float width, float height )
+	{
+		var angle = MathF.Atan2( width, height );
+
+		Bevel( width, height, angle, angle );
+	}
+
+	/// <summary>
+	/// Add faces starting at each active edge, traveling inwards and upwards to produce a bevel.
+	/// Use <paramref name="prevAngle"/> and <paramref name="nextAngle"/> to control the normal directions
+	/// at the start and end of the bevel faces. Angles are in radians, with 0 pointing outwards along
+	/// the plane of the polygon, and PI/2 pointing upwards away from the plane.
+	/// If the bevel distance is large enough the mesh will become closed. Otherwise, you can use
+	/// <see cref="Close"/> to add a flat face after the bevel.
+	/// </summary>
+	/// <param name="width">Total distance inwards.</param>
+	/// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
+	/// <param name="prevAngle">Angle, in radians, to use for normals at the outside of the bevel.</param>
+	/// <param name="nextAngle"></param>
+	public void Bevel( float width, float height, float prevAngle, float nextAngle )
 	{
 		if ( width < 0f )
 		{
 			throw new ArgumentOutOfRangeException( nameof( width ) );
 		}
 
-		Bevel_UpdateExistingVertices( width, height, smooth );
+		Bevel_UpdateExistingVertices( width, height, prevAngle, nextAngle );
 
 		var cutList = Bevel_PossibleCutList ??= new List<(int A, int B)>();
 		var edgeList = Bevel_ActiveEdgeList ??= new List<int>();
@@ -167,35 +186,25 @@ partial class PolygonMeshBuilder
 		PostBevel();
 	}
 
-	private void Bevel_UpdateExistingVertices( float width, float height, bool smooth )
+	private void Bevel_UpdateExistingVertices( float width, float height, float prevAngle, float nextAngle )
 	{
 		_nextDistance = _prevDistance + width;
 		_nextHeight = _prevHeight + height;
-		_nextAngle = MathF.Atan2( width, height );
-		_minSmoothNormalDot = MathF.Cos( MathF.PI / 180f * MaxSmoothAngle );
+		_nextAngle = nextAngle;
+		_minSmoothNormalDot = MathF.Cos( Math.Clamp( MaxSmoothAngle, 0f, MathF.PI ) );
 
 		_invDistance = width <= 0.0001f ? 0f : 1f / (_nextDistance - _prevDistance);
 
-		if ( !smooth )
+		if ( Math.Abs( _prevAngle - prevAngle ) >= 0.001f )
 		{
-			_prevAngle = _nextAngle;
-
 			foreach ( var index in _activeEdges )
 			{
 				ref var edge = ref _allEdges[index];
 				edge.Vertices = (-1, -1);
 			}
 		}
-		else if ( float.IsPositiveInfinity( width ) )
-		{
-			_prevAngle = _nextAngle;
-			BlendNormals( _prevPrevHeight, _prevHeight, _prevPrevAngle, _prevAngle );
-		}
-		else if ( _prevDistance > 0f )
-		{
-			_prevAngle = (_prevAngle + _nextAngle) * 0.5f;
-			BlendNormals( _prevPrevHeight, _prevHeight, _prevPrevAngle, _prevAngle );
-		}
+
+		_prevAngle = prevAngle;
 
 		PossibleCuts.Clear();
 
@@ -374,9 +383,7 @@ partial class PolygonMeshBuilder
 	private void PostBevel()
 	{
 		_prevDistance = _nextDistance;
-		_prevPrevHeight = _prevHeight;
 		_prevHeight = _nextHeight;
-		_prevPrevAngle = _prevAngle;
 		_prevAngle = _nextAngle;
 	}
 

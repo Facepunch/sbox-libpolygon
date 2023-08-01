@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static Sandbox.Package;
 
 namespace Sandbox.Polygons;
 
@@ -23,11 +24,9 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 	private float _invDistance;
 
-	private float _prevPrevHeight;
 	private float _prevHeight;
 	private float _nextHeight;
 
-	private float _prevPrevAngle;
 	private float _prevAngle;
 	private float _nextAngle;
 
@@ -45,7 +44,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 	/// <summary>
 	/// Corners of the original polygon with an interior or exterior
-	/// angle less than this (in degrees) will have smooth normals.
+	/// angle less than this (in radians) will have smooth normals.
 	/// </summary>
 	public float MaxSmoothAngle { get; set; } = 0f;
 
@@ -57,7 +56,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 	/// <summary>
 	/// Normals of each vertex in the generated mesh.
 	/// </summary>
-    public IReadOnlyList<Vector3> Normals => _normals;
+	public IReadOnlyList<Vector3> Normals => _normals;
 	
 	/// <summary>
 	/// Indices of vertices describing the triangulation of the generated mesh.
@@ -81,11 +80,9 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 		_invDistance = 0f;
 
-		_prevPrevHeight = 0f;
 		_prevHeight = 0f;
 		_nextHeight = 0f;
 
-		_prevPrevAngle = 0f;
 		_prevAngle = 0f;
 		_nextAngle = 0f;
 
@@ -268,38 +265,6 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		return edge.Vertices;
 	}
 
-	private void BlendNormals( float minHeight, float maxHeight, float minAngle, float maxAngle )
-	{
-		var invRange = minHeight < maxHeight ? 1f / (maxHeight - minHeight) : float.PositiveInfinity;
-
-		var sinMax = MathF.Sin( maxAngle );
-		var cosMax = MathF.Cos( maxAngle );
-
-		for ( var i = 0; i < _vertices.Count; ++i )
-		{
-			var pos = _vertices[i];
-
-			if ( pos.z < minHeight )
-			{
-				continue;
-			}
-
-			if ( pos.z >= maxHeight )
-			{
-				_normals[i] = Helpers.RotateNormal( _normals[i], sinMax, cosMax );
-				continue;
-			}
-
-			var t = Math.Clamp( (pos.z - minHeight) * invRange, 0f, 1f );
-			var angle = LerpRadians( minAngle, maxAngle, t );
-
-			var sin = MathF.Sin( angle );
-			var cos = MathF.Cos( angle );
-
-			_normals[i] = Helpers.RotateNormal( _normals[i], sin, cos );
-		}
-	}
-
 	private void AddTriangle( int a, int b, int c )
 	{
 		_indices.Add( a );
@@ -307,42 +272,88 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		_indices.Add( c );
 	}
 
-    /// <summary>
-    /// Add faces on each active edge extending upwards by the given height.
-    /// </summary>
-    /// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
-    /// <param name="smooth">If true, use smooth normals rather than flat shading.</param>
-    public void Extrude( float height, bool smooth )
-    {
-	    Bevel( 0f, height, smooth );
-    }
+	/// <summary>
+	/// Add faces on each active edge extending upwards by the given height.
+	/// </summary>
+	/// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
+	public void Extrude( float height )
+	{
+		Bevel( 0f, height );
+	}
 
 	/// <summary>
-	/// Perform successive <see cref="Bevel"/>s so that the edge of the polygon curves inwards.
+	/// Add faces on each active edge extending inwards by the given width. This will close the mesh if <paramref name="width"/> is large enough.
+	/// </summary>
+	/// <param name="width">Total distance inwards.</param>
+	public void Inset( float width )
+	{
+		Bevel( width, 0f );
+	}
+
+	/// <summary>
+	/// Perform successive <see cref="Bevel"/>s so that the edge of the polygon curves inwards in a quarter circle arc.
 	/// </summary>
 	/// <param name="faces">How many bevels to split the rounded edge into.</param>
 	/// <param name="width">Total distance inwards.</param>
 	/// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
 	/// <param name="smooth">If true, use smooth normals rather than flat shading.</param>
-	public void Round( int faces, float width, float height, bool smooth )
+	/// <param name="convex">If true, the faces will be pointing outwards from the center of the arc.</param>
+	public void Arc( int faces, float width, float height, bool smooth = true, bool convex = true )
 	{
 		var prevWidth = 0f;
 		var prevHeight = 0f;
+		var prevTheta = 0f;
+
+		static float MapAngle( float theta, bool convex, bool positive )
+		{
+			var min = positive ? 0f : MathF.PI * 0.5f;
+			return convex ? min + theta : min + MathF.PI * 0.5f - theta;
+		}
 
 		for ( var i = 0; i < faces; ++i )
 		{
 			var theta = MathF.PI * 0.5f * (i + 1f) / faces;
+
 			var cos = MathF.Cos( theta );
 			var sin = MathF.Sin( theta );
 
 			var nextWidth = 1f - cos;
 			var nextHeight = sin;
 
-			Bevel( (nextWidth - prevWidth) * width,
-				(nextHeight - prevHeight) * height, smooth );
+			if ( smooth )
+			{
+				if ( height >= 0f == convex )
+				{
+					Bevel( (nextWidth - prevWidth) * width,
+						(nextHeight - prevHeight) * height,
+						MapAngle( prevTheta, convex, height >= 0f ),
+						MapAngle( theta, convex, height >= 0f ) );
+				}
+				else
+				{
+					Bevel( (nextHeight - prevHeight) * width,
+						(nextWidth - prevWidth) * height,
+						MapAngle( prevTheta, convex, height >= 0f ),
+						MapAngle( theta, convex, height >= 0f ) );
+				}
+            }
+			else
+			{
+				if ( height >= 0f == convex )
+				{
+					Bevel( (nextWidth - prevWidth) * width,
+						(nextHeight - prevHeight) * height );
+				}
+				else
+				{
+					Bevel( (nextHeight - prevHeight) * width,
+						(nextWidth - prevWidth) * height );
+				}
+            }
 
 			prevWidth = nextWidth;
 			prevHeight = nextHeight;
+			prevTheta = theta;
 		}
 	}
 }
