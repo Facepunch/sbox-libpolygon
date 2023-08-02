@@ -1,5 +1,5 @@
 ﻿using System;
-using Sandbox.Svg;
+using Sandbox.Utility.Svg;
 
 namespace Sandbox.Polygons;
 
@@ -30,9 +30,9 @@ partial class PolygonMeshBuilder
     /// <param name="options">Options for generating vertices from paths.</param>
     public void AddSvg( string contents, AddSvgOptions options = null )
     {
-        var paths = SvgHelper.FromString( contents );
+        var svg = SvgDocument.FromString( contents );
 
-        foreach ( var path in paths )
+        foreach ( var path in svg.Paths )
         {
             AddPath( path, options );
         }
