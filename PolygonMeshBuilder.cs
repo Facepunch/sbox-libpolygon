@@ -16,6 +16,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 	private readonly List<Vector3> _vertices = new List<Vector3>();
 	private readonly List<Vector3> _normals = new List<Vector3>();
+	private readonly List<Vector4> _tangents = new List<Vector4>();
 	private readonly List<int> _indices = new List<int>();
 
 	private float _prevDistance;
@@ -56,7 +57,12 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 	/// Normals of each vertex in the generated mesh.
 	/// </summary>
 	public IReadOnlyList<Vector3> Normals => _normals;
-	
+
+	/// <summary>
+	/// U-tangents, and the signs of the V-tangents, of each vertex in the generated mesh.
+	/// </summary>
+	public IReadOnlyList<Vector4> Tangents => _tangents;
+
 	/// <summary>
 	/// Indices of vertices describing the triangulation of the generated mesh.
 	/// </summary>
@@ -72,6 +78,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 		_vertices.Clear();
 		_normals.Clear();
+		_tangents.Clear();
 		_indices.Clear();
 
 		_prevDistance = 0f;
@@ -208,6 +215,13 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		return a + delta * Math.Clamp( t, 0f, 1f );
 	}
 
+	private Vector4 GetTangent( Vector3 normal )
+	{
+		var tangent = Vector3.Cross( normal, new Vector3( 0f, 0f, 1f ) ).Normal;
+
+		return new Vector4( tangent, 1f );
+	}
+
 	private (int Prev, int Next) AddVertices( ref Edge edge, bool forceMaxDistance = false )
 	{
 		if ( edge.Vertices.Prev > -1 )
@@ -215,8 +229,10 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 			return edge.Vertices;
 		}
 
+		var prevEdge = _allEdges[edge.PrevEdge];
+
 		var index = _vertices.Count;
-		var prevNormal = -_allEdges[edge.PrevEdge].Normal;
+		var prevNormal = -prevEdge.Normal;
 		var nextNormal = -edge.Normal;
 
 		var t = forceMaxDistance ? 1f : (edge.Distance - _prevDistance) * _invDistance;
@@ -228,6 +244,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		{
 			_vertices.Add( pos );
 			_normals.Add( new Vector3( 0f, 0f, 1f ) );
+			_tangents.Add( new Vector4( 1f, 0f, 0f, 1f ) );
 
 			edge.Vertices = (index, index);
 		}
@@ -243,6 +260,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 				_vertices.Add( pos );
 				_normals.Add( normal );
+				_tangents.Add( GetTangent( normal ) );
 
 				edge.Vertices = (index, index);
 			}
@@ -253,9 +271,11 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 				_vertices.Add( pos );
 				_normals.Add( normal0 );
+				_tangents.Add( GetTangent( normal0 ) );
 
 				_vertices.Add( pos );
 				_normals.Add( normal1 );
+				_tangents.Add( GetTangent( normal1 ) );
 
 				edge.Vertices = (index, index + 1);
 			}
@@ -297,6 +317,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 	{
 		_vertices.EnsureCapacity( _vertices.Count * 2 );
 		_normals.EnsureCapacity( _normals.Count * 2 );
+		_tangents.EnsureCapacity( _tangents.Count * 2 );
 		_indices.EnsureCapacity( _indices.Count * 2 );
 
 		var indexCount = _indices.Count;
@@ -306,9 +327,11 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		{
 			var position = _vertices[i];
 			var normal = _normals[i];
+			var tangent = _tangents[i];
 
 			_vertices.Add( new Vector3( position.x, position.y, z * 2f - position.z ) );
 			_normals.Add( new Vector3( normal.x, normal.y, -normal.z ) );
+			_tangents.Add( new Vector4( tangent.x, tangent.y, -tangent.z, -tangent.w ) );
 		}
 
 		for ( var i = 0; i < indexCount; i += 3 )

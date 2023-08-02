@@ -371,6 +371,7 @@ partial class PolygonMeshBuilder
 
 		_vertices.Add( _vertices[di.Prev] );
 		_normals.Add( _normals[bi.Next] );
+		_tangents.Add( _tangents[bi.Next] );
 
 		AddTriangle( ai.Next, di.Prev, bi.Prev );
 		AddTriangle( bi.Next, fi, ci.Prev );
