@@ -9,11 +9,11 @@ partial class PolygonMeshBuilder
 	/// <summary>
 	/// Triangulate any remaining active edges so that the generated mesh is closed.
 	/// </summary>
-	public void Close()
+	public void Fill()
 	{
-		Close_UpdateExistingVertices();
-		Close_SplitIntoMonotonicPolygons();
-		Close_Triangulate();
+		Fill_UpdateExistingVertices();
+		Fill_SplitIntoMonotonicPolygons();
+		Fill_Triangulate();
 
 		PostBevel();
 	}
@@ -58,13 +58,13 @@ partial class PolygonMeshBuilder
 	}
 
 	[ThreadStatic]
-	private static List<int> Close_SortedEdges;
+	private static List<int> Fill_SortedEdges;
 
 	[ThreadStatic]
-	private static Dictionary<int, (int Index, bool WasMerge)> Close_Helpers;
+	private static Dictionary<int, (int Index, bool WasMerge)> Fill_Helpers;
 
 	[ThreadStatic]
-	private static List<SweepEdge> Close_SweepEdges;
+	private static List<SweepEdge> Fill_SweepEdges;
 
 	private readonly struct SweepEdge
 	{
@@ -113,7 +113,7 @@ partial class PolygonMeshBuilder
 
 	private int FixUp( ref Edge v, in Edge e )
 	{
-		var helperInfo = Close_Helpers[e.Index];
+		var helperInfo = Fill_Helpers[e.Index];
 
 		if ( helperInfo.WasMerge )
 		{
@@ -125,7 +125,7 @@ partial class PolygonMeshBuilder
 
 	private void SetHelper( in Edge edge, in Edge helper, bool wasMerge )
 	{
-		Close_Helpers[edge.Index] = (helper.Index, wasMerge);
+		Fill_Helpers[edge.Index] = (helper.Index, wasMerge);
 	}
 
 	private void AddSweepEdge( in Edge edge )
@@ -133,8 +133,8 @@ partial class PolygonMeshBuilder
 		// TODO: could binary search for insertion point
 
 		var origin = edge.Origin;
-		Close_SweepEdges.Add( new SweepEdge( edge ) );
-		Close_SweepEdges.Sort( ( a, b ) =>
+		Fill_SweepEdges.Add( new SweepEdge( edge ) );
+		Fill_SweepEdges.Sort( ( a, b ) =>
 			a.GetEdgeY( origin.x ).CompareTo( b.GetEdgeY( origin.x ) ) );
 	}
 
@@ -142,11 +142,11 @@ partial class PolygonMeshBuilder
 	{
 		// TODO: could binary search
 
-		for ( var i = 0; i < Close_SweepEdges.Count; ++i )
+		for ( var i = 0; i < Fill_SweepEdges.Count; ++i )
 		{
-			if ( Close_SweepEdges[i].Index == old.Index )
+			if ( Fill_SweepEdges[i].Index == old.Index )
 			{
-				Close_SweepEdges[i] = new SweepEdge( in replacement );
+				Fill_SweepEdges[i] = new SweepEdge( in replacement );
 				break;
 			}
 		}
@@ -156,11 +156,11 @@ partial class PolygonMeshBuilder
 	{
 		// TODO: could binary search
 
-		for ( var i = 0; i < Close_SweepEdges.Count; ++i )
+		for ( var i = 0; i < Fill_SweepEdges.Count; ++i )
 		{
-			if ( Close_SweepEdges[i].Index == edge.Index )
+			if ( Fill_SweepEdges[i].Index == edge.Index )
 			{
-				Close_SweepEdges.RemoveAt( i );
+				Fill_SweepEdges.RemoveAt( i );
 				break;
 			}
 		}
@@ -170,7 +170,7 @@ partial class PolygonMeshBuilder
 	{
 		// TODO: could binary search
 
-		foreach ( var other in Close_SweepEdges )
+		foreach ( var other in Fill_SweepEdges )
 		{
 			if ( edge.PrevEdge == other.Index || edge.Index == other.Index )
 			{
@@ -186,7 +186,7 @@ partial class PolygonMeshBuilder
 		throw new Exception();
 	}
 
-	private void Close_UpdateExistingVertices()
+	private void Fill_UpdateExistingVertices()
 	{
 		_nextAngle = MathF.PI * 0.5f;
 		_nextDistance = float.PositiveInfinity;
@@ -205,26 +205,26 @@ partial class PolygonMeshBuilder
 		_prevAngle = _nextAngle;
 	}
 
-	private void Close_SplitIntoMonotonicPolygons()
+	private void Fill_SplitIntoMonotonicPolygons()
 	{
-		Close_SortedEdges ??= new List<int>();
-		Close_SortedEdges.Clear();
+		Fill_SortedEdges ??= new List<int>();
+		Fill_SortedEdges.Clear();
 
-		Close_SortedEdges.AddRange( _activeEdges );
+		Fill_SortedEdges.AddRange( _activeEdges );
 
-		Close_SortedEdges.Sort( ( a, b ) => Compare( _allEdges[a].Origin, _allEdges[b].Origin ) );
+		Fill_SortedEdges.Sort( ( a, b ) => Compare( _allEdges[a].Origin, _allEdges[b].Origin ) );
 
-		Close_Helpers ??= new Dictionary<int, (int Index, bool WasMerge)>();
-		Close_Helpers.Clear();
+		Fill_Helpers ??= new Dictionary<int, (int Index, bool WasMerge)>();
+		Fill_Helpers.Clear();
 
-		Close_SweepEdges ??= new List<SweepEdge>();
-		Close_SweepEdges.Clear();
+		Fill_SweepEdges ??= new List<SweepEdge>();
+		Fill_SweepEdges.Clear();
 
 		// Based on https://www.cs.umd.edu/class/spring2020/cmsc754/Lects/lect05-triangulate.pdf
 
 		// Add pairs of edges to split into x-monotonic polygons
 
-		foreach ( var index in Close_SortedEdges )
+		foreach ( var index in Fill_SortedEdges )
 		{
 			EnsureCapacity( 4 );
 
@@ -247,7 +247,7 @@ partial class PolygonMeshBuilder
 				case SweepEvent.Split:
 					{
 						ref var above = ref _allEdges[FindAboveSweepEdge( in edge )];
-						ref var helper = ref _allEdges[Close_Helpers[above.Index].Index];
+						ref var helper = ref _allEdges[Fill_Helpers[above.Index].Index];
 						ref var fixedUp = ref _allEdges[ConnectTwoWay( ref edge, ref helper )];
 						AddSweepEdge( in edge );
 						SetHelper( in above, in fixedUp, false );
@@ -304,10 +304,10 @@ partial class PolygonMeshBuilder
 	}
 
 	[ThreadStatic]
-	private static List<CloseVertex> Close_Vertices;
+	private static List<CloseVertex> Fill_Vertices;
 
 	[ThreadStatic]
-	private static Stack<CloseVertex> Close_Stack;
+	private static Stack<CloseVertex> Fill_Stack;
 
 	private static bool IsReflex( Vector2 prevDelta, Vector2 nextDelta )
 	{
@@ -321,10 +321,10 @@ partial class PolygonMeshBuilder
 		return a.y.CompareTo( b.y );
 	}
 
-	private void Close_Triangulate()
+	private void Fill_Triangulate()
 	{
-		Close_Vertices ??= new List<CloseVertex>();
-		Close_Stack ??= new Stack<CloseVertex>();
+		Fill_Vertices ??= new List<CloseVertex>();
+		Fill_Stack ??= new Stack<CloseVertex>();
 
 		while ( _activeEdges.Count > 0 )
 		{
@@ -358,15 +358,15 @@ partial class PolygonMeshBuilder
 				}
 			}
 
-			Close_Vertices.Clear();
+			Fill_Vertices.Clear();
 
 			edge = _allEdges[minEdgeIndex];
-			Close_Vertices.Add( new CloseVertex( edge.Origin, default, edge.Vertices.Prev, true ) );
+			Fill_Vertices.Add( new CloseVertex( edge.Origin, default, edge.Vertices.Prev, true ) );
 
 			while ( edge.NextEdge != maxEdgeIndex )
 			{
 				var next = _allEdges[edge.NextEdge];
-				Close_Vertices.Add( new CloseVertex( next.Origin, next.Origin - edge.Origin, next.Vertices.Prev, true ) );
+				Fill_Vertices.Add( new CloseVertex( next.Origin, next.Origin - edge.Origin, next.Vertices.Prev, true ) );
 				edge = next;
 			}
 
@@ -375,29 +375,29 @@ partial class PolygonMeshBuilder
 			while ( edge.Index != minEdgeIndex )
 			{
 				var next = _allEdges[edge.NextEdge];
-				Close_Vertices.Add( new CloseVertex( edge.Origin, edge.Origin - next.Origin, edge.Vertices.Prev, false ) );
+				Fill_Vertices.Add( new CloseVertex( edge.Origin, edge.Origin - next.Origin, edge.Vertices.Prev, false ) );
 				edge = next;
 			}
 
-			Close_Vertices.Sort( ( a, b ) => Compare( a.Position, b.Position ) );
+			Fill_Vertices.Sort( ( a, b ) => Compare( a.Position, b.Position ) );
 
-			Close_Stack.Clear();
-			Close_Stack.Push( Close_Vertices[0] );
-			Close_Stack.Push( Close_Vertices[1] );
+			Fill_Stack.Clear();
+			Fill_Stack.Push( Fill_Vertices[0] );
+			Fill_Stack.Push( Fill_Vertices[1] );
 
-			for ( var i = 2; i < Close_Vertices.Count; ++i )
+			for ( var i = 2; i < Fill_Vertices.Count; ++i )
 			{
-				var next = Close_Vertices[i];
-				var top = Close_Stack.Peek();
+				var next = Fill_Vertices[i];
+				var top = Fill_Stack.Peek();
 
 				if ( top.IsUpper != next.IsUpper )
 				{
 					// Case 1
 
-					while ( Close_Stack.Count > 1 )
+					while ( Fill_Stack.Count > 1 )
 					{
-						var curr = Close_Stack.Pop();
-						var prev = Close_Stack.Peek();
+						var curr = Fill_Stack.Pop();
+						var prev = Fill_Stack.Peek();
 
 						if ( next.IsUpper )
 						{
@@ -409,18 +409,18 @@ partial class PolygonMeshBuilder
 						}
 					}
 
-					Close_Stack.Clear();
-					Close_Stack.Push( top );
-					Close_Stack.Push( new CloseVertex( next.Position,
+					Fill_Stack.Clear();
+					Fill_Stack.Push( top );
+					Fill_Stack.Push( new CloseVertex( next.Position,
 						next.Position - top.Position,
 						next.Vertex, next.IsUpper ) );
 					continue;
 				}
 
-				while ( Close_Stack.Count > 1 && IsReflex( top.Delta, next.Position - top.Position ) != top.IsUpper )
+				while ( Fill_Stack.Count > 1 && IsReflex( top.Delta, next.Position - top.Position ) != top.IsUpper )
 				{
-					var curr = Close_Stack.Pop();
-					top = Close_Stack.Peek();
+					var curr = Fill_Stack.Pop();
+					top = Fill_Stack.Peek();
 
 					if ( next.IsUpper )
 					{
@@ -432,7 +432,7 @@ partial class PolygonMeshBuilder
 					}
 				}
 
-				Close_Stack.Push( new CloseVertex( next.Position,
+				Fill_Stack.Push( new CloseVertex( next.Position,
 					next.Position - top.Position,
 					next.Vertex, next.IsUpper ) );
 			}
