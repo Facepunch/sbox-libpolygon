@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace Sandbox.Polygons;
 
@@ -71,7 +72,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 	/// <summary>
 	/// Clear all geometry from this builder.
 	/// </summary>
-	public void Clear()
+	public PolygonMeshBuilder Clear()
 	{
 		_nextEdgeIndex = 0;
 		_activeEdges.Clear();
@@ -93,6 +94,8 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		_nextAngle = 0f;
 
 		_minSmoothNormalDot = 0f;
+
+		return this;
 	}
 
 	/// <summary>
@@ -139,18 +142,24 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 	/// <param name="vertices">List of vertices to read a range from.</param>
 	/// <param name="offset">Index of the first vertex in the loop.</param>
 	/// <param name="count">Number of vertices in the loop.</param>
-	public void AddEdgeLoop( IReadOnlyList<Vector2> vertices, int offset, int count )
+	/// <param name="reverse">If true, reverse the order of the vertices in the loop.</param>
+	public PolygonMeshBuilder AddEdgeLoop( IReadOnlyList<Vector2> vertices, int offset, int count, bool reverse = false )
+	{
+		return AddEdgeLoop( vertices, offset, count, Vector2.Zero, Vector2.One, reverse );
+	}
+
+	public PolygonMeshBuilder AddEdgeLoop( IReadOnlyList<Vector2> vertices, int offset, int count, Vector2 position, Vector2 scale, bool reverse = false )
 	{
 		var firstIndex = _nextEdgeIndex;
 
 		EnsureCapacity( count );
 
-		var prevVertex = vertices[offset + count - 1];
+		var prevVertex = position + vertices[offset + count - 1] * scale;
 		for ( var i = 0; i < count; ++i )
 		{
-			var nextVertex = vertices[offset + i];
+			var nextVertex = position + vertices[offset + i] * scale;
 
-			_activeEdges.Add( AddEdge( prevVertex, Helpers.NormalizeSafe( nextVertex - prevVertex), _prevDistance ) );
+			_activeEdges.Add( AddEdge( prevVertex, Helpers.NormalizeSafe( nextVertex - prevVertex ), _prevDistance ) );
 
 			prevVertex = nextVertex;
 		}
@@ -160,9 +169,20 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		{
 			ref var prevEdge = ref _allEdges[firstIndex + prevIndex];
 			ref var nextEdge = ref _allEdges[firstIndex + i];
-			ConnectEdges( ref prevEdge, ref nextEdge );
+
+			if ( reverse )
+			{
+				ConnectEdges( ref nextEdge, ref prevEdge );
+			}
+			else
+			{
+				ConnectEdges( ref prevEdge, ref nextEdge );
+			}
+
 			prevIndex = i;
 		}
+
+		return this;
 	}
 
 	[ThreadStatic]
@@ -295,25 +315,25 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 	/// Add faces on each active edge extending upwards by the given height.
 	/// </summary>
 	/// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
-	public void Extrude( float height )
+	public PolygonMeshBuilder Extrude( float height )
 	{
-		Bevel( 0f, height );
+		return Bevel( 0f, height );
 	}
 
 	/// <summary>
 	/// Add faces on each active edge extending inwards by the given width. This will close the mesh if <paramref name="width"/> is large enough.
 	/// </summary>
 	/// <param name="width">Total distance inwards.</param>
-	public void Inset( float width )
+	public PolygonMeshBuilder Inset( float width )
 	{
-		Bevel( width, 0f );
+		return Bevel( width, 0f );
 	}
 
 	/// <summary>
 	/// Mirrors all previously created faces. The mirror plane is normal to the Z axis, with a given distance from the origin.
 	/// </summary>
 	/// <param name="z">Distance of the mirror plane from the origin.</param>
-	public void Mirror( float z = 0f )
+	public PolygonMeshBuilder Mirror( float z = 0f )
 	{
 		_vertices.EnsureCapacity( _vertices.Count * 2 );
 		_normals.EnsureCapacity( _normals.Count * 2 );
@@ -344,17 +364,31 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 			_indices.Add( c );
 			_indices.Add( b );
 		}
+
+		return this;
 	}
 
 	/// <summary>
 	/// Perform successive <see cref="Bevel"/>s so that the edge of the polygon curves inwards in a quarter circle arc.
 	/// </summary>
+	/// <param name="radius">Radius of the arc.</param>
 	/// <param name="faces">How many bevels to split the rounded edge into.</param>
-	/// <param name="width">Total distance inwards.</param>
-	/// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
 	/// <param name="smooth">If true, use smooth normals rather than flat shading.</param>
 	/// <param name="convex">If true, the faces will be pointing outwards from the center of the arc.</param>
-	public void Arc( int faces, float width, float height, bool smooth = true, bool convex = true )
+	public PolygonMeshBuilder Arc( float radius, int faces, bool smooth = true, bool convex = true )
+	{
+		return Arc( radius, radius, faces, smooth, convex );
+	}
+
+	/// <summary>
+	/// Perform successive <see cref="Bevel"/>s so that the edge of the polygon curves inwards in a quarter circle arc.
+	/// </summary>
+	/// <param name="width">Total distance inwards.</param>
+	/// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
+	/// <param name="faces">How many bevels to split the rounded edge into.</param>
+	/// <param name="smooth">If true, use smooth normals rather than flat shading.</param>
+	/// <param name="convex">If true, the faces will be pointing outwards from the center of the arc.</param>
+	public PolygonMeshBuilder Arc( float width, float height, int faces, bool smooth = true, bool convex = true )
 	{
 		var prevWidth = 0f;
 		var prevHeight = 0f;
@@ -411,5 +445,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 			prevHeight = nextHeight;
 			prevTheta = theta;
 		}
+
+		return this;
 	}
 }

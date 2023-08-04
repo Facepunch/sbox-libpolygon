@@ -20,11 +20,11 @@ partial class PolygonMeshBuilder
 	/// </summary>
 	/// <param name="width">Total distance inwards.</param>
 	/// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
-	public void Bevel( float width, float height )
+	public PolygonMeshBuilder Bevel( float width, float height )
 	{
 		var angle = MathF.Atan2( width, height );
 
-		Bevel( width, height, angle, angle );
+		return Bevel( width, height, angle, angle );
 	}
 
 	/// <summary>
@@ -39,7 +39,7 @@ partial class PolygonMeshBuilder
 	/// <param name="height">Total distance upwards, away from the plane of the polygon.</param>
 	/// <param name="prevAngle">Angle, in radians, to use for normals at the outside of the bevel.</param>
 	/// <param name="nextAngle"></param>
-	public void Bevel( float width, float height, float prevAngle, float nextAngle )
+	public PolygonMeshBuilder Bevel( float width, float height, float prevAngle, float nextAngle )
 	{
 		if ( width < 0f )
 		{
@@ -184,6 +184,8 @@ partial class PolygonMeshBuilder
 		}
 
 		PostBevel();
+
+		return this;
 	}
 
 	private void Bevel_UpdateExistingVertices( float width, float height, float prevAngle, float nextAngle )

@@ -9,13 +9,15 @@ partial class PolygonMeshBuilder
 	/// <summary>
 	/// Triangulate any remaining active edges so that the generated mesh is closed.
 	/// </summary>
-	public void Fill()
+	public PolygonMeshBuilder Fill()
 	{
 		Fill_UpdateExistingVertices();
 		Fill_SplitIntoMonotonicPolygons();
 		Fill_Triangulate();
 
 		PostBevel();
+
+		return this;
 	}
 
 	private enum SweepEvent
