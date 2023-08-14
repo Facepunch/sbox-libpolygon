@@ -329,12 +329,18 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		return Bevel( width, 0f );
 	}
 
+	[ThreadStatic]
+	private static Dictionary<int, int> Mirror_IndexMap;
+
 	/// <summary>
 	/// Mirrors all previously created faces. The mirror plane is normal to the Z axis, with a given distance from the origin.
 	/// </summary>
 	/// <param name="z">Distance of the mirror plane from the origin.</param>
 	public PolygonMeshBuilder Mirror( float z = 0f )
 	{
+		Mirror_IndexMap ??= new Dictionary<int, int>();
+		Mirror_IndexMap.Clear();
+
 		_vertices.EnsureCapacity( _vertices.Count * 2 );
 		_normals.EnsureCapacity( _normals.Count * 2 );
 		_tangents.EnsureCapacity( _tangents.Count * 2 );
@@ -349,16 +355,25 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 			var normal = _normals[i];
 			var tangent = _tangents[i];
 
-			_vertices.Add( new Vector3( position.x, position.y, z * 2f - position.z ) );
-			_normals.Add( new Vector3( normal.x, normal.y, -normal.z ) );
-			_tangents.Add( new Vector4( tangent.x, tangent.y, -tangent.z, -tangent.w ) );
+			if ( Math.Abs( position.z - z ) <= 0.001f && Math.Abs( normal.z ) <= 0.0001f && Math.Abs( tangent.z ) <= 0.0001f )
+			{
+				Mirror_IndexMap.Add( i, i );
+			}
+			else
+			{
+				Mirror_IndexMap.Add( i, _vertices.Count );
+
+				_vertices.Add( new Vector3( position.x, position.y, z * 2f - position.z ) );
+				_normals.Add( new Vector3( normal.x, normal.y, -normal.z ) );
+				_tangents.Add( new Vector4( tangent.x, tangent.y, -tangent.z, tangent.w ) );
+			}
 		}
 
 		for ( var i = 0; i < indexCount; i += 3 )
 		{
-			var a = _indices[i + 0] + vertexCount;
-			var b = _indices[i + 1] + vertexCount;
-			var c = _indices[i + 2] + vertexCount;
+			var a = Mirror_IndexMap[_indices[i + 0]];
+			var b = Mirror_IndexMap[_indices[i + 1]];
+			var c = Mirror_IndexMap[_indices[i + 2]];
 
 			_indices.Add( a );
 			_indices.Add( c );
