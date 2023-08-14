@@ -193,7 +193,7 @@ partial class PolygonMeshBuilder
 		_nextDistance = _prevDistance + width;
 		_nextHeight = _prevHeight + height;
 		_nextAngle = nextAngle;
-		_minSmoothNormalDot = MathF.Cos( Math.Clamp( MaxSmoothAngle, 0f, MathF.PI ) );
+		_minSmoothNormalDot = MathF.Cos( Math.Clamp( MaxSmoothAngle, 0f, MathF.PI * (511f / 512f) ) );
 
 		_invDistance = width <= 0.0001f ? 0f : 1f / (_nextDistance - _prevDistance);
 
