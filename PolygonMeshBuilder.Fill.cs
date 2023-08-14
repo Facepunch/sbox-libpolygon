@@ -193,7 +193,7 @@ partial class PolygonMeshBuilder
 		_nextAngle = MathF.PI * 0.5f;
 		_nextDistance = float.PositiveInfinity;
 
-		if ( Math.Abs( _prevAngle - _nextAngle ) >= 0.001f )
+		if ( !SkipNormals && Math.Abs( _prevAngle - _nextAngle ) >= 0.001f )
 		{
 			foreach ( var index in _activeEdges )
 			{

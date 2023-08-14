@@ -50,6 +50,11 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 	public float MaxSmoothAngle { get; set; } = 0f;
 
 	/// <summary>
+	/// If true, don't bother generating normals / tangents.
+	/// </summary>
+	public bool SkipNormals { get; set; }
+
+	/// <summary>
 	/// Positions of each vertex in the generated mesh.
 	/// </summary>
 	public IReadOnlyList<Vector3> Vertices => _vertices;
@@ -106,6 +111,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		Clear();
 
 		MaxSmoothAngle = 0f;
+		SkipNormals = false;
 	}
 
 	private static int NextPowerOfTwo( int value )
@@ -260,7 +266,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 		var pos = new Vector3( edge.Origin.x, edge.Origin.y, height );
 
-		if ( MathF.Abs( _nextHeight - _prevHeight ) <= 0.001f )
+		if ( SkipNormals || MathF.Abs( _nextHeight - _prevHeight ) <= 0.001f )
 		{
 			_vertices.Add( pos );
 			_normals.Add( new Vector3( 0f, 0f, 1f ) );
@@ -355,7 +361,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 			var normal = _normals[i];
 			var tangent = _tangents[i];
 
-			if ( Math.Abs( position.z - z ) <= 0.001f && Math.Abs( normal.z ) <= 0.0001f && Math.Abs( tangent.z ) <= 0.0001f )
+			if ( Math.Abs( position.z - z ) <= 0.001f && (SkipNormals || Math.Abs( normal.z ) <= 0.0001f && Math.Abs( tangent.z ) <= 0.0001f) )
 			{
 				Mirror_IndexMap.Add( i, i );
 			}

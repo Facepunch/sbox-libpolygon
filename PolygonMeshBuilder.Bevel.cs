@@ -197,7 +197,7 @@ partial class PolygonMeshBuilder
 
 		_invDistance = width <= 0.0001f ? 0f : 1f / (_nextDistance - _prevDistance);
 
-		if ( Math.Abs( _prevAngle - prevAngle ) >= 0.001f )
+		if ( !SkipNormals && Math.Abs( _prevAngle - prevAngle ) >= 0.001f )
 		{
 			foreach ( var index in _activeEdges )
 			{
