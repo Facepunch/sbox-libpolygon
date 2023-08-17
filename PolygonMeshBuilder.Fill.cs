@@ -11,6 +11,8 @@ partial class PolygonMeshBuilder
 	/// </summary>
 	public PolygonMeshBuilder Fill()
 	{
+		Validate();
+
 		Fill_UpdateExistingVertices();
 		Fill_SplitIntoMonotonicPolygons();
 		Fill_Triangulate();

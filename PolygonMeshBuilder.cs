@@ -33,6 +33,8 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 	private float _minSmoothNormalDot;
 
+	private bool _validated;
+
 	/// <summary>
 	/// Number of edges that will be affected by calls to methods like <see cref="Bevel"/>, <see cref="Round"/>, and <see cref="Close"/>.
 	/// </summary>
@@ -100,6 +102,8 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 		_minSmoothNormalDot = 0f;
 
+		_validated = true;
+
 		return this;
 	}
 
@@ -141,6 +145,11 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		return edge.Index;
 	}
 
+	private void Invalidate()
+	{
+		_validated = false;
+	}
+
 	/// <summary>
 	/// Add a set of active edges forming a loop. Clockwise loops will be a solid polygon, and count-clockwise
 	/// will form a hole. Holes must be inside of solid polygons, otherwise the mesh can't be closed correctly.
@@ -159,8 +168,9 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		var firstIndex = _nextEdgeIndex;
 
 		EnsureCapacity( count );
+		Invalidate();
 
-		var prevVertex = position + vertices[offset + count - 1] * scale;
+        var prevVertex = position + vertices[offset + count - 1] * scale;
 		for ( var i = 0; i < count; ++i )
 		{
 			var nextVertex = position + vertices[offset + i] * scale;
@@ -205,8 +215,9 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		AddEdges_VertexMap.Clear();
 
 		EnsureCapacity( edges.Count );
+		Invalidate();
 
-		foreach ( var (i, j) in edges )
+        foreach ( var (i, j) in edges )
 		{
 			var prev = vertices[i];
 			var next = vertices[j];

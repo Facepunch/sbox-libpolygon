@@ -46,6 +46,7 @@ partial class PolygonMeshBuilder
 			throw new ArgumentOutOfRangeException( nameof( width ) );
 		}
 
+		Validate();
 		Bevel_UpdateExistingVertices( width, height, prevAngle, nextAngle );
 
 		var cutList = Bevel_PossibleCutList ??= new List<(int A, int B)>();
@@ -445,7 +446,7 @@ partial class PolygonMeshBuilder
 
 		if ( dPrev - dNext <= 0.001f )
 		{
-			var epsilon = GetEpsilon( thisOrigin, nextOrigin );
+			var epsilon = GetEpsilon( thisOrigin, nextOrigin, 0.001f );
 			edge.MaxDistance = posDist <= epsilon ? baseDistance : float.PositiveInfinity;
 		}
 		else
