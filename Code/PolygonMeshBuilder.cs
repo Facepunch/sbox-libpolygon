@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Sandbox.Polygons;
 
@@ -11,14 +12,22 @@ namespace Sandbox.Polygons;
 /// </summary>
 public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 {
+	public record struct Vertex( Vector3 Position, Vector3 Normal, Vector4 Tangent )
+	{
+		public static VertexAttribute[] Layout { get; } = new[]
+		{
+			new VertexAttribute( VertexAttributeType.Position, VertexAttributeFormat.Float32 ),
+			new VertexAttribute( VertexAttributeType.Normal, VertexAttributeFormat.Float32 ),
+			new VertexAttribute( VertexAttributeType.Tangent, VertexAttributeFormat.Float32, 4 )
+		};
+	}
+
 	private int _nextEdgeIndex;
 	private Edge[] _allEdges = new Edge[64];
-	private readonly HashSet<int> _activeEdges = new HashSet<int>();
+	private readonly HashSet<int> _activeEdges = new ();
 
-	private readonly List<Vector3> _vertices = new List<Vector3>();
-	private readonly List<Vector3> _normals = new List<Vector3>();
-	private readonly List<Vector4> _tangents = new List<Vector4>();
-	private readonly List<int> _indices = new List<int>();
+	private readonly List<Vertex> _vertices = new ();
+	private readonly List<int> _indices = new ();
 
 	private float _prevDistance;
 	private float _nextDistance;
@@ -59,22 +68,27 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 	/// <summary>
 	/// Positions of each vertex in the generated mesh.
 	/// </summary>
-	public IReadOnlyList<Vector3> Vertices => _vertices;
+	public IEnumerable<Vector3> Positions => _vertices.Select( x => x.Position );
 
 	/// <summary>
 	/// Normals of each vertex in the generated mesh.
 	/// </summary>
-	public IReadOnlyList<Vector3> Normals => _normals;
+	public IEnumerable<Vector3> Normals => _vertices.Select( x => x.Normal );
 
 	/// <summary>
 	/// U-tangents, and the signs of the V-tangents, of each vertex in the generated mesh.
 	/// </summary>
-	public IReadOnlyList<Vector4> Tangents => _tangents;
+	public IEnumerable<Vector4> Tangents => _vertices.Select( x => x.Tangent );
+
+	/// <summary>
+	/// Positions, normals, and tangents of each vertex.
+	/// </summary>
+	public List<Vertex> Vertices => _vertices;
 
 	/// <summary>
 	/// Indices of vertices describing the triangulation of the generated mesh.
 	/// </summary>
-	public IReadOnlyList<int> Indices => _indices;
+	public List<int> Indices => _indices;
 
 	/// <summary>
 	/// Clear all geometry from this builder.
@@ -85,8 +99,6 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		_activeEdges.Clear();
 
 		_vertices.Clear();
-		_normals.Clear();
-		_tangents.Clear();
 		_indices.Clear();
 
 		_prevDistance = 0f;
@@ -279,9 +291,10 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 		if ( SkipNormals || MathF.Abs( _nextHeight - _prevHeight ) <= 0.001f )
 		{
-			_vertices.Add( pos );
-			_normals.Add( new Vector3( 0f, 0f, 1f ) );
-			_tangents.Add( new Vector4( 1f, 0f, 0f, 1f ) );
+			_vertices.Add( new(
+				pos,
+				new Vector3( 0f, 0f, 1f ),
+				new Vector4( 1f, 0f, 0f, 1f ) ) );
 
 			edge.Vertices = (index, index);
 		}
@@ -295,9 +308,7 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 			{
 				var normal = new Vector3( (prevNormal.x + nextNormal.x) * cos, (prevNormal.y + nextNormal.y) * cos, sin * 2f ).Normal;
 
-				_vertices.Add( pos );
-				_normals.Add( normal );
-				_tangents.Add( GetTangent( normal ) );
+				_vertices.Add( new( pos, normal, GetTangent( normal ) ) );
 
 				edge.Vertices = (index, index);
 			}
@@ -306,13 +317,8 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 				var normal0 = new Vector3( prevNormal.x * cos, prevNormal.y * cos, sin ).Normal;
 				var normal1 = new Vector3( nextNormal.x * cos, nextNormal.y * cos, sin ).Normal;
 
-				_vertices.Add( pos );
-				_normals.Add( normal0 );
-				_tangents.Add( GetTangent( normal0 ) );
-
-				_vertices.Add( pos );
-				_normals.Add( normal1 );
-				_tangents.Add( GetTangent( normal1 ) );
+				_vertices.Add( new( pos, normal0, GetTangent( normal0 ) ) );
+				_vertices.Add( new( pos, normal1, GetTangent( normal1 ) ) );
 
 				edge.Vertices = (index, index + 1);
 			}
@@ -359,8 +365,6 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 		Mirror_IndexMap.Clear();
 
 		_vertices.EnsureCapacity( _vertices.Count * 2 );
-		_normals.EnsureCapacity( _normals.Count * 2 );
-		_tangents.EnsureCapacity( _tangents.Count * 2 );
 		_indices.EnsureCapacity( _indices.Count * 2 );
 
 		var indexCount = _indices.Count;
@@ -368,9 +372,10 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 
 		for ( var i = 0; i < vertexCount; i++ )
 		{
-			var position = _vertices[i];
-			var normal = _normals[i];
-			var tangent = _tangents[i];
+			var vertex = _vertices[i];
+			var position = vertex.Position;
+			var normal = vertex.Normal;
+			var tangent = vertex.Tangent;
 
 			if ( Math.Abs( position.z - z ) <= 0.001f && (SkipNormals || Math.Abs( normal.z ) <= 0.0001f && Math.Abs( tangent.z ) <= 0.0001f) )
 			{
@@ -380,9 +385,10 @@ public partial class PolygonMeshBuilder : Pooled<PolygonMeshBuilder>
 			{
 				Mirror_IndexMap.Add( i, _vertices.Count );
 
-				_vertices.Add( new Vector3( position.x, position.y, z * 2f - position.z ) );
-				_normals.Add( new Vector3( normal.x, normal.y, -normal.z ) );
-				_tangents.Add( new Vector4( tangent.x, tangent.y, -tangent.z, tangent.w ) );
+				_vertices.Add( new(
+					new Vector3( position.x, position.y, z * 2f - position.z ),
+					new Vector3( normal.x, normal.y, -normal.z ),
+					new Vector4( tangent.x, tangent.y, -tangent.z, tangent.w ) ) );
 			}
 		}
 

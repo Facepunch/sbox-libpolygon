@@ -372,9 +372,10 @@ partial class PolygonMeshBuilder
 
 		var fi = _vertices.Count;
 
-		_vertices.Add( _vertices[di.Prev] );
-		_normals.Add( _normals[bi.Next] );
-		_tangents.Add( _tangents[bi.Next] );
+		_vertices.Add( new(
+			_vertices[di.Prev].Position,
+			_vertices[bi.Next].Normal,
+			_vertices[bi.Next].Tangent ) );
 
 		AddTriangle( ai.Next, di.Prev, bi.Prev );
 		AddTriangle( bi.Next, fi, ci.Prev );

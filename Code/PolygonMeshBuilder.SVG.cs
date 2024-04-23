@@ -117,6 +117,16 @@ partial class PolygonMeshBuilder
 			return this;
 		}
 
+		if ( path.FillType != PathFillType.Winding )
+		{
+			if ( options.ThrowIfNotSupported )
+			{
+				//throw new NotImplementedException( "Only fill-type: winding is supported." );
+			}
+
+			//return this;
+		}
+
 		var openPath = new List<Vector2>();
 		var last = Vector2.Zero;
 

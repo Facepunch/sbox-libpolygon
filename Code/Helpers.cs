@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace Sandbox.Polygons;
 
@@ -56,5 +57,25 @@ internal static class Helpers
 	public static float GetEpsilon( Vector2 a, Vector2 b, float frac = 0.0001f )
 	{
 		return Math.Max( GetEpsilon( a, frac ), GetEpsilon( b, frac ) );
+	}
+
+	public static void UpdateMesh<T>( this Mesh mesh, VertexAttribute[] layout, List<T> vertices, List<int> indices )
+		where T : unmanaged
+	{
+		if ( !mesh.HasIndexBuffer )
+		{
+			mesh.CreateVertexBuffer( vertices.Count, layout, vertices );
+			mesh.CreateIndexBuffer( indices.Count, indices );
+		}
+		else if ( indices.Count > 0 && vertices.Count > 0 )
+		{
+			mesh.SetIndexBufferSize( indices.Count );
+			mesh.SetVertexBufferSize( vertices.Count );
+
+			mesh.SetVertexBufferData( vertices );
+			mesh.SetIndexBufferData( indices );
+		}
+
+		mesh.SetIndexRange( 0, indices.Count );
 	}
 }

@@ -8,8 +8,6 @@ partial class PolygonMeshBuilder
 	[ThreadStatic]
 	private static List<int> Validate_EdgeList;
 
-	private string _svg;
-
 	private void Validate()
 	{
 		if ( _validated )
@@ -17,18 +15,12 @@ partial class PolygonMeshBuilder
 			return;
 		}
 
-		_validated = true;
+		// Check active edge loops:
+		// * Referenced edges must also be active
+		// * Make sure references are correct in both directions
+		// * Edges can't reference themselves
 
-		return;
-
-        _svg = ToSvg();
-
-        // Check active edge loops:
-        // * Referenced edges must also be active
-        // * Make sure references are correct in both directions
-        // * Edges can't reference themselves
-
-        foreach ( var edgeIndex in _activeEdges )
+		foreach ( var edgeIndex in _activeEdges )
 		{
 			ref var edge = ref _allEdges[edgeIndex];
 
@@ -87,7 +79,7 @@ partial class PolygonMeshBuilder
 				var b0 = edgeA0.Origin;
 				var b1 = edgeA1.Origin;
 
-                var minB = Vector2.Min( b0, b1 );
+				var minB = Vector2.Min( b0, b1 );
 				var maxB = Vector2.Max( b0, b1 );
 
 				if ( minA.x >= maxB.x || minA.y >= maxB.y || minB.x >= maxA.x || minB.y >= maxA.y )
